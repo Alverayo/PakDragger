@@ -1,0 +1,161 @@
+using System;
+using System.IO;
+using System.Diagnostics;
+using System.Net;
+using System.Windows.Forms;
+
+namespace PakFileHandler
+{
+    class Program // sorry for the messy code!
+    {
+        [STAThread]
+        static void Main(string[] args)
+        {
+            Console.Title = ("PaksTransfer ~ by Alverayo");
+            string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            string folderName = "PaksTransfer";
+            string folderPath = Path.Combine(desktopPath, folderName);
+
+            if (!Directory.Exists(folderPath))
+            {
+                Directory.CreateDirectory(folderPath);
+                Console.WriteLine($"Folder {folderName} was created.");
+                Console.WriteLine("Moving to the next step...");
+                System.Threading.Thread.Sleep(500);
+            }
+            else
+            {
+                Console.WriteLine($"Folder {folderName} already exists.");
+                Console.WriteLine("Moving to the next step...");
+                System.Threading.Thread.Sleep(500);
+            }
+            string exePath = Process.GetCurrentProcess().MainModule.FileName;
+            string fileName = Path.GetFileName(exePath);
+            string destPath = Path.Combine(folderPath, fileName);
+            if (File.Exists(destPath))
+            {
+                Console.WriteLine($"The file {fileName} already exists in the {folderName} folder.");
+            }
+            else
+            {
+                try
+                {
+                    Process cmd = new Process();
+                    cmd.StartInfo.FileName = "cmd.exe";
+                    cmd.StartInfo.RedirectStandardInput = true;
+                    cmd.StartInfo.RedirectStandardOutput = true;
+                    cmd.StartInfo.CreateNoWindow = true;
+                    cmd.StartInfo.UseShellExecute = false;
+                    cmd.Start();
+
+                    cmd.StandardInput.WriteLine($"move /y \"{exePath}\" \"{destPath}\"");
+                    cmd.StandardInput.Flush();
+                    cmd.StandardInput.Close();
+
+                    Console.WriteLine($"The file {fileName} has been moved to the {destPath} folder.");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"An error occurred: {ex.Message}");
+                    System.Threading.Thread.Sleep(2000);
+                }
+            }
+            string gameFolder = "DeadByDaylight";
+            string gameDirectory = null;
+            string gamePathFile = Path.Combine(folderPath, "gamepath.txt");
+            if (File.Exists(gamePathFile))
+            {
+                gameDirectory = File.ReadAllText(gamePathFile);
+            }
+            else
+            {
+                Console.Clear();
+                Console.WriteLine("Can't find game path. Please select where your game is downloaded.");
+                Console.WriteLine("");
+                Console.WriteLine("An Epic Games example location is : C:\\Program Files\\Epic Games\\DeadByDaylight");
+                Console.WriteLine("A Steam example location is: C:\\Program Files (x86)\\Steam\\steamapps\\common\\Dead by Daylight");
+                System.Threading.Thread.Sleep(2000);
+                FolderBrowserDialog dialog = new FolderBrowserDialog();
+                dialog.RootFolder = Environment.SpecialFolder.MyComputer;
+                dialog.Description = "Please select the folder where the game is downloaded.";
+                DialogResult result = dialog.ShowDialog();
+                if (result == DialogResult.OK)
+                {
+                    if (dialog.SelectedPath.Contains(gameFolder))
+                    {
+                        gameDirectory = dialog.SelectedPath;
+                        File.WriteAllText(gamePathFile, gameDirectory);
+                        Console.Clear();
+                        Console.WriteLine($"The game path has been saved to {gamePathFile} and is ready for .pak drags");
+                        System.Threading.Thread.Sleep(5000);
+                    }
+                    else
+                    {
+                        Console.Clear();
+                        Console.WriteLine("Incorrect folder selected. Please contact Alverayo.");
+                        System.Threading.Thread.Sleep(2000);
+                        Environment.Exit(0);
+                    }
+                }
+            }
+            if (args.Length > 0 && File.Exists(args[0]) && args[0].EndsWith(".pak"))
+            {
+                string draggedFilePath = args[0];
+                string draggedFileName = Path.GetFileNameWithoutExtension(draggedFilePath);
+                if (gameDirectory.Contains("Epic Games") && draggedFileName.Contains("WindowsNoEditor"))
+                {
+                    draggedFileName = draggedFileName.Replace("WindowsNoEditor", "EGS");
+                    string newDraggedFilePath = Path.Combine(Path.GetDirectoryName(draggedFilePath), draggedFileName + ".pak");
+                    File.Move(draggedFilePath, newDraggedFilePath);
+                    draggedFilePath = newDraggedFilePath;
+                }
+                else if (gameDirectory.Contains("Steam") && draggedFileName.Contains("EGS"))
+                {
+                    draggedFileName = draggedFileName.Replace("EGS", "WindowsNoEditor");
+                    string newDraggedFilePath = Path.Combine(Path.GetDirectoryName(draggedFilePath), draggedFileName + ".pak");
+                    File.Move(draggedFilePath, newDraggedFilePath);
+                    draggedFilePath = newDraggedFilePath;
+                }
+                if (draggedFileName.Contains("WindowsNoEditor") || draggedFileName.Contains("EGS"))
+                {
+                    string bakFilePath = Path.ChangeExtension(draggedFilePath, ".bak");
+                    File.Move(draggedFilePath, bakFilePath);
+                    string kekUrl = "https://cdn.discordapp.com/attachments/1132518159283396608/1133421324157587527/pakchunk348-EGS.kek";
+                    string sigUrl = "https://cdn.discordapp.com/attachments/1132518159283396608/1133421324509925436/pakchunk348-EGS.sig";
+                    using (WebClient client = new WebClient())
+                    {
+                        client.DownloadFile(kekUrl, draggedFileName + "-EGS.kek");
+                        client.DownloadFile(sigUrl, draggedFileName + "-EGS.sig");
+                    }
+                    string kekRenamedPath = Path.Combine(folderPath, draggedFileName + ".kek");
+                    string sigRenamedPath = Path.Combine(folderPath, draggedFileName + ".sig");
+                    File.Move(draggedFileName + "-EGS.kek", kekRenamedPath);
+                    File.Move(draggedFileName + "-EGS.sig", sigRenamedPath);
+                    Console.Clear();
+                    Console.WriteLine("Files downloaded and renamed successfully.");
+                    string contentPaksDir = Path.Combine(gameDirectory, "DeadByDaylight", "Content", "Paks");
+                    Directory.CreateDirectory(contentPaksDir);
+                    File.Move(kekRenamedPath, Path.Combine(contentPaksDir, Path.GetFileName(kekRenamedPath)));
+                    File.Move(sigRenamedPath, Path.Combine(contentPaksDir, Path.GetFileName(sigRenamedPath)));
+                    if (bakFilePath.EndsWith(".bak") && File.Exists(bakFilePath))
+                    {
+                        File.Move(bakFilePath, Path.Combine(contentPaksDir, Path.GetFileName(bakFilePath)));
+                    }
+                    Console.Clear();
+                    Console.WriteLine("Files moved to the game pak folder.");
+                    System.Threading.Thread.Sleep(1000);
+                    Environment.Exit(0);
+                }
+                else
+                {
+                    Console.Clear();
+                    Console.WriteLine("The dragged file name doesn't contain 'WindowsNoEditor' or 'EGS'.");
+                    Console.WriteLine("Files were not renamed.");
+                    Console.WriteLine("Please contact Alverayo.");
+                    System.Threading.Thread.Sleep(5000);
+                    Environment.Exit(0);
+                }
+            }
+        }
+    }
+}
